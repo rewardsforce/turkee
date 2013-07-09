@@ -127,6 +127,33 @@ module Turkee
       end
 
     end
+    
+    def self.force_complete(hit_id)
+  
+      hit = RTurk::Hit.find(hit_id)
+  
+      unless hit.empty?
+        logger.info "Preparing to close HIT: #{hit.inspect}"
+        logger.info "Approving all assignments and disposing of hit."
+    
+        begin
+          hit.expire!
+          hit.assignments.each do |assignment|
+            logger.info "Assignment status : #{assignment.status}"
+            assignment.approve!('__clear_all_turks__approved__') if assignment.status == 'Submitted'
+          end
+      
+          turkee_task = TurkeeTask.find_by_hit_id(hit.id)
+          turkee_task.complete_task
+      
+          hit.dispose!
+        rescue Exception => e
+          # Probably a service unavailable
+          logger.error "Exception : #{e.to_s}"
+        end
+      end
+
+    end
 
     def complete_task
       self.complete = true
